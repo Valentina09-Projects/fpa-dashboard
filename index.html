@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FP&A Task Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --color-bg: #f7f6f3;
+    --color-surface: #ffffff;
+    --color-border: rgba(0,0,0,0.10);
+    --color-border-strong: rgba(0,0,0,0.18);
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #5a5a56;
+    --color-text-muted: #9a9a94;
+    --color-accent: #185FA5;
+    --color-accent-light: #E6F1FB;
+    --color-success: #0F6E56;
+    --color-success-light: #E1F5EE;
+    --color-warning: #BA7517;
+    --color-warning-light: #FAEEDA;
+    --color-danger: #A32D2D;
+    --color-danger-light: #FCEBEB;
+    --color-today: #EEEDFE;
+    --color-today-border: #534AB7;
+    --font: -apple-system, 'Segoe UI', sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--color-bg); color: var(--color-text-primary); font-size: 14px; min-height: 100vh; }
+  header { background: var(--color-surface); border-bottom: 0.5px solid var(--color-border); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo-mark { width: 32px; height: 32px; background: var(--color-accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 15px; font-weight: 600; }
+  header h1 { font-size: 15px; font-weight: 500; }
+  .header-meta { font-size: 12px; color: var(--color-text-muted); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .upload-label { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); border: 0.5px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text-primary); font-size: 13px; cursor: pointer; transition: background 0.15s; }
+  .upload-label:hover { background: var(--color-bg); }
+  #file-input { display: none; }
+  .main-content { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .stat-card { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; }
+  .stat-label { font-size: 11px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 500; line-height: 1; }
+  .stat-sub { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
+  .stat-value.success { color: var(--color-success); }
+  .stat-value.warning { color: var(--color-warning); }
+  .stat-value.danger { color: var(--color-danger); }
+  .filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .filter-chip { padding: 4px 12px; border-radius: 20px; border: 0.5px solid var(--color-border-strong); background: var(--color-surface); font-size: 12px; cursor: pointer; transition: all 0.15s; color: var(--color-text-secondary); }
+  .filter-chip.active { background: var(--color-accent); color: white; border-color: var(--color-accent); }
+  .section-banner { display: flex; align-items: center; gap: 14px; background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 14px 20px; margin: 1.5rem 0 0.75rem; }
+  .section-banner-icon { font-size: 22px; line-height: 1; }
+  .section-banner-title { font-size: 15px; font-weight: 600; }
+  .section-banner-sub { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+  .calendar-wrapper { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 0.75rem; }
+  .calendar-grid { overflow-x: auto; }
+  .calendar-legend { display: flex; gap: 16px; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-secondary); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+  .legend-dot.projection { background: var(--color-accent-light); border: 1.5px solid var(--color-accent); }
+  .legend-dot.real { background: var(--color-success-light); border: 1.5px solid var(--color-success); }
+  .legend-dot.late { background: var(--color-warning-light); border: 1.5px solid var(--color-warning); }
+  .legend-dot.today { background: var(--color-today); border: 1.5px solid var(--color-today-border); }
+  table.cal { border-collapse: collapse; table-layout: auto; width: 100%; }
+  .cal th { padding: 8px 2px; text-align: center; font-size: 11px; font-weight: 500; color: var(--color-text-muted); border-bottom: 0.5px solid var(--color-border); background: var(--color-bg); min-width: 38px; width: 38px; }
+  .cal th.today-header { color: var(--color-today-border); font-weight: 600; }
+  .cal th .day-num { display: block; font-size: 14px; font-weight: 500; color: var(--color-text-primary); margin-top: 2px; }
+  .cal th.today-header .day-num { color: var(--color-today-border); }
+  .cal td { vertical-align: middle; padding: 4px 2px; border-right: 0.5px solid var(--color-border); border-bottom: 0.5px solid var(--color-border); min-width: 38px; width: 38px; text-align: center; }
+  .cal td.today-col { background: var(--color-today); }
+  .cal td.task-label-col { background: var(--color-bg); min-width: 340px; width: 340px; padding: 12px 16px; border-right: 1px solid var(--color-border-strong); vertical-align: middle; }
+  .task-info { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+  .task-name { font-size: 13px; font-weight: 500; line-height: 1.4; white-space: normal; word-break: break-word; }
+  .task-desc { font-size: 12px; color: var(--color-text-secondary); line-height: 1.4; white-space: normal; word-break: break-word; }
+  .task-meta { font-size: 11px; color: var(--color-text-muted); }
+  .area-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 500; margin-top: 2px; }
+  .area-accounting { background: #E6F1FB; color: #185FA5; }
+  .area-finance { background: #E1F5EE; color: #0F6E56; }
+  .area-commercial { background: #EEEDFE; color: #534AB7; }
+  .area-projects { background: #FAEEDA; color: #BA7517; }
+  .area-fpa { background: #FAECE7; color: #993C1D; }
+  .cell-event { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 36px; }
+  .event-dot { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; }
+  .event-dot.projection { background: var(--color-accent-light); color: var(--color-accent); border: 1.5px solid var(--color-accent); }
+  .event-dot.real { background: var(--color-success-light); color: var(--color-success); border: 1.5px solid var(--color-success); }
+  .event-dot.late { background: var(--color-warning-light); color: var(--color-warning); border: 1.5px solid var(--color-warning); }
+  .tasks-table-wrapper { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+  table.tasks { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tasks th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 0.5px solid var(--color-border); background: var(--color-bg); }
+  .tasks td { padding: 11px 14px; border-bottom: 0.5px solid var(--color-border); vertical-align: middle; }
+  .tasks tr:last-child td { border-bottom: none; }
+  .tasks tr:hover td { background: var(--color-bg); }
+  .diff-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .diff-on { background: var(--color-success-light); color: var(--color-success); }
+  .diff-late { background: var(--color-warning-light); color: var(--color-warning); }
+  .diff-early { background: var(--color-accent-light); color: var(--color-accent); }
+  .diff-pending { background: #E1F5EE; color: #0F6E56; }
+  .diff-due-today { background: var(--color-today); color: var(--color-today-border); font-weight: 600; }
+  .diff-overdue { background: var(--color-danger-light); color: var(--color-danger); font-weight: 600; }
+  .toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--color-text-primary); color: white; padding: 10px 18px; border-radius: var(--radius); font-size: 13px; opacity: 0; transform: translateY(10px); transition: opacity 0.2s, transform 0.2s; z-index: 200; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  @media (max-width: 700px) { .stats-row { grid-template-columns: repeat(2,1fr); } .main-content { padding: 1rem; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <div class="logo-mark">FP</div>
+    <div>
+      <h1>FP&amp;A Task Dashboard</h1>
+      <div class="header-meta" id="header-meta">Actualizado: 16 de may de 2026 · Task_FP_A.xlsx</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <label class="upload-label" for="file-input">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Actualizar Excel
+    </label>
+    <input type="file" id="file-input" accept=".xlsx,.xls" />
+  </div>
+</header>
+<div class="main-content" id="main-content"></div>
+<div class="toast" id="toast"></div>
+<script>
+const USA_HOLIDAYS_2026 = ['2026-01-01','2026-01-19','2026-02-16','2026-05-25','2026-07-03','2026-09-07','2026-10-12','2026-11-11','2026-11-26','2026-12-25'];
+function isUSAWorkday(iso) {
+  const d = new Date(iso); const day = d.getDay();
+  if (day===0||day===6) return false;
+  if (USA_HOLIDAYS_2026.includes(iso)) return false;
+  return true;
+}
+function formatDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d); if (isNaN(dt)) return '—';
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+const AREA_CLASSES = { accounting:'area-accounting', finance:'area-finance', commercial:'area-commercial', projects:'area-projects', "fp&a":'area-fpa', fpa:'area-fpa' };
+function getAreaClass(a) { return AREA_CLASSES[(a||'').toLowerCase()]||'area-accounting'; }
+let globalTasks = [];
+let activeFilter = 'all';
+function getDaysInMonth(y,m) { return new Date(y,m,0).getDate(); }
+
+function renderDashboard(tasks) {
+  globalTasks = tasks;
+  const today = new Date();
+  const todayISO = today.toISOString().slice(0,10);
+  const months = [...new Set(tasks.map(t=>t.month))];
+  const areas = [...new Set(tasks.map(t=>t.area))];
+  const total = tasks.length;
+  const onTime = tasks.filter(t=>t.diff!==null&&t.diff>=0).length;
+  const late = tasks.filter(t=>t.diff!==null&&t.diff<0).length;
+  const completed = tasks.filter(t=>t.realDate!==null).length;
+  const filteredTasks = activeFilter==='all' ? tasks : tasks.filter(t=>t.area===activeFilter);
+  let html = '';
+  html += `<div class="stats-row">
+    <div class="stat-card"><div class="stat-label">Total Tasks</div><div class="stat-value">${total}</div><div class="stat-sub">${months.join(', ')}</div></div>
+    <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value success">${completed}</div><div class="stat-sub">with real date</div></div>
+    <div class="stat-card"><div class="stat-label">On Time</div><div class="stat-value ${onTime>0?'success':'warning'}">${onTime}</div><div class="stat-sub">diff ≥ 0 days</div></div>
+    <div class="stat-card"><div class="stat-label">Late / Overdue</div><div class="stat-value ${late>0?'danger':'success'}">${late}</div><div class="stat-sub">after projection date</div></div>
+  </div>`;
+  html += '<div class="filter-bar"><span style="font-size:12px;color:var(--color-text-muted);margin-right:4px">Filter:</span>';
+  html += `<span class="filter-chip ${activeFilter==='all'?'active':''}" onclick="setFilter('all')">All areas</span>`;
+  areas.forEach(a => { html += `<span class="filter-chip ${activeFilter===a?'active':''}" onclick="setFilter('${a}')">${a}</span>`; });
+  html += '</div>';
+  const SECTION_ICONS = { resources:'🔗', owner:'⭐' };
+  function sectionIcon(s) { const k=(s||'').toLowerCase(); for(const key in SECTION_ICONS){if(k.startsWith(key))return SECTION_ICONS[key];} return '📋'; }
+  const monthNames = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+  months.forEach(monthName => {
+    const monthTasks = filteredTasks.filter(t=>t.month===monthName);
+    if(!monthTasks.length) return;
+    const mn = monthNames[(monthName.match(/(w+)/)?.[1]||'').toUpperCase()]||5;
+    const allDates = [];
+    for(let d=1;d<=getDaysInMonth(2026,mn);d++){const dt=new Date(2026,mn-1,d);const iso=dt.toISOString().slice(0,10);if(isUSAWorkday(iso))allDates.push({day:d,iso,dow:dt.getDay()});}
+    const sections = [...new Set(monthTasks.map(t=>t.section||'General'))];
+    sections.forEach(section => {
+      const st = monthTasks.filter(t=>(t.section||'General')===section);
+      if(!st.length) return;
+      html += `<div class="section-banner"><span class="section-banner-icon">${sectionIcon(section)}</span><div><div class="section-banner-title">${section}</div><div class="section-banner-sub">${monthName} 2026 · ${st.length} task${st.length!==1?'s':''}</div></div><div class="calendar-legend" style="margin-left:auto"><div class="legend-item"><div class="legend-dot projection"></div>Projection</div><div class="legend-item"><div class="legend-dot real"></div>Completed</div><div class="legend-item"><div class="legend-dot late"></div>Late</div><div class="legend-item"><div class="legend-dot today"></div>Today</div></div></div>`;
+      html += '<div class="calendar-wrapper"><div class="calendar-grid"><table class="cal"><thead><tr><th style="text-align:left;padding-left:12px;min-width:340px;width:340px">Task</th>';
+      const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      allDates.forEach(({day,iso,dow})=>{const isT=iso===todayISO;html+=`<th class="${isT?'today-header':''}">${dayNames[dow]}<span class="day-num">${day}</span></th>`;});
+      html += '</tr></thead><tbody>';
+      st.forEach(task => {
+        html += `<tr><td class="task-label-col"><div class="task-info"><span class="area-badge ${getAreaClass(task.area)}">${task.area}</span><span class="task-name">${task.task}</span>${task.email?`<span class="task-desc">${task.email}</span>`:''}<span class="task-meta">${task.responsible}</span></div></td>`;
+        allDates.forEach(({iso})=>{
+          const isT=iso===todayISO;
+          const isProj=task.projectionDate===iso, isReal=task.realDate===iso, isLate=isReal&&task.diff!==null&&task.diff<0;
+          let inner='';
+          if(isLate) inner=`<div class="cell-event"><div class="event-dot late" title="Late ${Math.abs(task.diff)}d">R</div></div>`;
+          else if(isReal) inner='<div class="cell-event"><div class="event-dot real" title="Completed">R</div></div>';
+          else if(isProj) inner='<div class="cell-event"><div class="event-dot projection" title="Projection">P</div></div>';
+          html+=`<td class="${isT?'today-col':''}">${inner}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div></div>';
+      html += '<div class="tasks-table-wrapper" style="margin-bottom:2rem"><table class="tasks"><thead><tr><th>Area</th><th>Responsible</th><th>Task</th><th>Description</th><th>Projection Date</th><th>Real Date</th><th>Status</th></tr></thead><tbody>';
+      st.forEach(task => {
+        let chip='';
+        if(task.diff===null){
+          if(task.projectionDate){
+            const cd=Math.round((new Date(task.projectionDate)-new Date(todayISO))/86400000);
+            if(cd>0) chip=`<span class="diff-chip diff-pending">⏳ ${cd}d to go</span>`;
+            else if(cd===0) chip='<span class="diff-chip diff-due-today">Due today</span>';
+            else chip=`<span class="diff-chip diff-overdue">⚠ ${Math.abs(cd)}d overdue</span>`;
+          } else chip='<span class="diff-chip" style="background:var(--color-bg);color:var(--color-text-muted)">No date</span>';
+        } else if(task.diff===0) chip='<span class="diff-chip diff-on">✓ On time</span>';
+        else if(task.diff>0) chip=`<span class="diff-chip diff-early">+${task.diff}d early</span>`;
+        else chip=`<span class="diff-chip diff-late">${Math.abs(task.diff)}d late</span>`;
+        html+=`<tr><td><span class="area-badge ${getAreaClass(task.area)}">${task.area}</span></td><td style="font-weight:500">${task.responsible}</td><td>${task.task}</td><td style="color:var(--color-text-secondary)">${task.email||'—'}</td><td>${formatDate(task.projectionDate)}</td><td>${formatDate(task.realDate)}</td><td>${chip}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    });
+  });
+  document.getElementById('main-content').innerHTML = html;
+}
+
+function setFilter(area) { activeFilter=area; renderDashboard(globalTasks); }
+
+function parseExcel(buffer) {
+  const wb = XLSX.read(buffer, { type:'array', cellDates:true });
+  const allTasks = [];
+  wb.SheetNames.forEach(sheetName => {
+    const ws = wb.Sheets[sheetName];
+    if(!ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    function cellVal(r,c){const addr=XLSX.utils.encode_cell({r,c});const cell=ws[addr];if(!cell)return null;if(cell.t==='d')return cell.v;if(cell.t==='n')return cell.v;if(cell.t==='s')return cell.v===''?null:cell.v;return null;}
+    function cellStr(r,c){const v=cellVal(r,c);return v!==null&&v!==undefined?String(v).trim():'';}
+    function toISO(val){if(!val)return null;if(val instanceof Date){const y=val.getUTCFullYear(),m=String(val.getUTCMonth()+1).padStart(2,'0'),d=String(val.getUTCDate()).padStart(2,'0');return y+'-'+m+'-'+d;}return null;}
+    let headerRow=-1,colArea=-1,colResp=-1,colTask=-1,colEmail=-1,colProj=-1,colReal=-1;
+    for(let r=range.s.r;r<=range.e.r;r++){for(let c=range.s.c;c<=range.e.c;c++){if(cellStr(r,c).toUpperCase()==='AREA'){headerRow=r;colArea=c;break;}}if(headerRow!==-1)break;}
+    if(headerRow===-1)return;
+    for(let c=range.s.c;c<=range.e.c;c++){const v=cellStr(headerRow,c).toUpperCase();if(v==='RESPONSIBLE')colResp=c;else if(v==='TASK')colTask=c;else if(v==='EMAIL')colEmail=c;else if(v.includes('PROJECTION DATE'))colProj=c;else if(v.includes('REAL DATE'))colReal=c;}
+    if(colTask===-1||colProj===-1)return;
+    const SKWS=['resources','owner'];
+    let currentSection='General';
+    for(let r=headerRow+1;r<=range.e.r;r++){
+      const colAVal=cellStr(r,range.s.c).toLowerCase();
+      if(colAVal&&SKWS.some(k=>colAVal.startsWith(k))){currentSection=cellStr(r,range.s.c);continue;}
+      const area=cellStr(r,colArea),task=cellStr(r,colTask);
+      if(!area||!task)continue;
+      const projISO=toISO(cellVal(r,colProj)),realISO=toISO(cellVal(r,colReal));
+      let diff=null;
+      if(projISO&&realISO)diff=Math.round((new Date(projISO)-new Date(realISO))/86400000);
+      allTasks.push({month:sheetName,section:currentSection,area,responsible:cellStr(r,colResp),task,email:colEmail!==-1?cellStr(r,colEmail):'',projectionDate:projISO,realDate:realISO,diff});
+    }
+  });
+  return allTasks;
+}
+
+function loadFile(file) {
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const tasks=parseExcel(new Uint8Array(e.target.result));
+      if(!tasks.length){showToast('No tasks found.');return;}
+      activeFilter='all';
+      renderDashboard(tasks);
+      document.getElementById('header-meta').textContent=tasks.length+' tasks · '+file.name+' · updated';
+      showToast('✓ '+tasks.length+' tasks loaded');
+    }catch(err){showToast('Error: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('file-input').addEventListener('change',e=>loadFile(e.target.files[0]));
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();loadFile(e.dataTransfer.files[0]);});
+
+// ── BAKED-IN DATA ──────────────────────────────────────────────────────────
+const BAKED_TASKS = [{"month":"MAY","section":"Resources Confirmations","area":"Accounting","responsible":"Sam Nelson","task":"Close Moth Confirmation","email":"April 2026 Month Close","projectionDate":"2026-05-13","realDate":"2026-05-15","diff":-2},{"month":"MAY","section":"Resources Confirmations","area":"Finance","responsible":"Lina AR / Natalia AP","task":"Cash Review","email":"","projectionDate":"2026-05-15","realDate":"2026-05-16","diff":-1},{"month":"MAY","section":"Resources Confirmations","area":"Commercial","responsible":"James","task":"Figures Confirmation","email":"James Cahalin","projectionDate":"2026-05-15","realDate":null,"diff":null},{"month":"MAY","section":"Resources Confirmations","area":"Commercial","responsible":"Will Bullock","task":"Figures Confirmation","email":"Forecast Validation – Americas","projectionDate":"2026-05-15","realDate":null,"diff":null},{"month":"MAY","section":"Resources Confirmations","area":"Projects","responsible":"Mercedes Garcia","task":"Figures Confirmation","email":"Análisis Actuals vs Forecast – Proyectos TBS, Sur del Meta y ABC Senegal","projectionDate":"2026-05-15","realDate":null,"diff":null},{"month":"MAY","section":"Owner Activities","area":"FP&A","responsible":"Zeyda Navarro","task":"Quater Report","email":"","projectionDate":"2026-05-27","realDate":null,"diff":null},{"month":"MAY","section":"Owner Activities","area":"FP&A","responsible":"Zeyda Navarro","task":"Monthy Report","email":"","projectionDate":"2026-05-27","realDate":null,"diff":null},{"month":"MAY","section":"Owner Activities","area":"FP&A","responsible":"Zeyda Navarro","task":"Financial Statements for Alma","email":"","projectionDate":"2026-05-22","realDate":null,"diff":null},{"month":"MAY","section":"Owner Activities","area":"FP&A","responsible":"Zeyda Navarro","task":"Bi-Week Report","email":"","projectionDate":"2026-05-19","realDate":null,"diff":null},{"month":"MAY","section":"Owner Activities","area":"FP&A","responsible":"Zeyda Navarro","task":"Review and Categorized Actuals","email":"","projectionDate":"2026-05-19","realDate":null,"diff":null},{"month":"MAY","section":"Owner Activities","area":"FP&A","responsible":"Zeyda Navarro","task":"Fiscal Year Report","email":"","projectionDate":"2026-05-27","realDate":null,"diff":null}];
+globalTasks = BAKED_TASKS;
+renderDashboard(BAKED_TASKS);
+</script>
+</body>
+</html>
